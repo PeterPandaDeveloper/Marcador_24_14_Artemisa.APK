@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,17 +30,72 @@ class TimerPage extends StatefulWidget {
 class _TimerPageState extends State<TimerPage> {
   BluetoothConnection? connection;
   int tiempoRestante = 0;
-  int ultimoTiempoSeteado = 0; 
+  int ultimoTiempoSeteado = 0;
   Timer? _timer;
-  
+
   String logStatus = "Modo sin conexión Bluetooth";
   final TextEditingController _timeController = TextEditingController();
 
   final Color azulUTMACH = const Color(0xFF4DA6FF);
   final Color naranjaUTMACH = const Color(0xFFFF8C29);
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    connection?.dispose();
+    connection = null;
+    _timeController.dispose();
+    super.dispose();
+  }
+
   // --- LÓGICA BLUETOOTH ULTRA-RÁPIDA ---
   void conectarBluetooth() async {
+    // 1. Pedir permisos runtime (Android 12+ / API 31+)
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ].request();
+
+    bool scanOk = statuses[Permission.bluetoothScan]?.isGranted ?? false;
+    bool connectOk = statuses[Permission.bluetoothConnect]?.isGranted ?? false;
+
+    if (!mounted) return;
+
+    if (!scanOk || !connectOk) {
+      // Si el usuario negó permanentemente, ofrecer ir a ajustes
+      bool permanentlyDenied =
+          (statuses[Permission.bluetoothScan]?.isPermanentlyDenied ?? false) ||
+          (statuses[Permission.bluetoothConnect]?.isPermanentlyDenied ?? false);
+
+      setState(() => logStatus = "Permisos Bluetooth denegados");
+
+      if (permanentlyDenied) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Permisos requeridos"),
+            content: const Text(
+                "Activa los permisos de Bluetooth y Ubicación en Ajustes para conectar el marcador."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: const Text("Abrir Ajustes"),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       List<BluetoothDevice> devices = await FlutterBluetoothSerial.instance.getBondedDevices();
       if (!mounted) return;
@@ -66,9 +122,11 @@ class _TimerPageState extends State<TimerPage> {
       if (selectedDevice != null) {
         setState(() => logStatus = "Conectando...");
         connection = await BluetoothConnection.toAddress(selectedDevice.address);
+        if (!mounted) return;
         setState(() => logStatus = "Conectado a ${selectedDevice.name}");
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => logStatus = "Error de conexión");
     }
   }
@@ -76,14 +134,23 @@ class _TimerPageState extends State<TimerPage> {
   // LA MAGIA ESTÁ AQUÍ: Enviamos un Byte puro en lugar de texto
   void enviarComandoByte(int byteCmd, int seg) async {
     if (connection != null && connection!.isConnected) {
-      // Uint8List convierte el número en un paquete binario perfecto de 8 bits
-      connection!.output.add(Uint8List.fromList([byteCmd]));
-      await connection!.output.allSent;
-      
-      setState(() {
-        tiempoRestante = seg;
-        logStatus = "Señal enviada: $byteCmd";
-      });
+      try {
+        connection!.output.add(Uint8List.fromList([byteCmd]));
+        await connection!.output.allSent;
+
+        if (!mounted) return;
+        setState(() {
+          tiempoRestante = seg;
+          logStatus = "Señal enviada: $byteCmd";
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          tiempoRestante = seg;
+          logStatus = "Bluetooth desconectado";
+          connection = null;
+        });
+      }
     } else {
       setState(() {
         tiempoRestante = seg;
@@ -101,6 +168,10 @@ class _TimerPageState extends State<TimerPage> {
       if (tiempoRestante > 0) {
         enviarComandoByte(250, tiempoRestante); // 250 = START
         _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
           if (tiempoRestante > 0) {
             setState(() => tiempoRestante--);
           } else {
@@ -122,7 +193,6 @@ class _TimerPageState extends State<TimerPage> {
     } else if (ultimoTiempoSeteado == 24) {
       enviarComandoByte(254, 24); // 254 = H24
     } else {
-      // Si fue manual, enviamos el mismo número como Byte
       enviarComandoByte(ultimoTiempoSeteado, ultimoTiempoSeteado);
     }
   }
@@ -178,13 +248,13 @@ class _TimerPageState extends State<TimerPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildBotonTexturizado("14", () { 
-                    _timer?.cancel(); 
+                  _buildBotonTexturizado("14", () {
+                    _timer?.cancel();
                     ultimoTiempoSeteado = 14;
                     enviarComandoByte(253, 14); // Enviamos código 253
                   }),
-                  _buildBotonTexturizado("24", () { 
-                    _timer?.cancel(); 
+                  _buildBotonTexturizado("24", () {
+                    _timer?.cancel();
                     ultimoTiempoSeteado = 24;
                     enviarComandoByte(254, 24); // Enviamos código 254
                   }),
@@ -196,10 +266,10 @@ class _TimerPageState extends State<TimerPage> {
               TextField(
                 controller: _timeController,
                 keyboardType: TextInputType.number,
-                enableInteractiveSelection: false, 
+                enableInteractiveSelection: false,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(2), 
+                  LengthLimitingTextInputFormatter(2),
                 ],
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 decoration: InputDecoration(
