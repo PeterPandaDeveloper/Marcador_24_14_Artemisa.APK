@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.11.0 <4.0.0' # Esta es la línea que te falta
+  sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -13,8 +13,20 @@ dependencies:
   flutter_bluetooth_serial: ^0.4.0
   permission_handler: ^11.3.1
 
+# --- ESTO ERA LO QUE FALTABA ---
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/icono.png"
+# -------------------------------
+
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/balon.png
-    - assets/images/LOGO_OUT.png
+    - assets/images/icono.png
+    - assets/images/fondo.png

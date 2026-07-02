@@ -6,23 +6,33 @@ import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  runApp(UTMACHTimerApp());
+  
+  // BLOQUEO INTELIGENTE: Fija la app estrictamente en modo vertical
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]).then((_) {
+    runApp(const UTMACHTimerApp());
+  });
 }
 
 class UTMACHTimerApp extends StatelessWidget {
+  const UTMACHTimerApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Contador 24 y 14 segundos',
       theme: ThemeData(primarySwatch: Colors.indigo),
-      home: TimerPage(),
+      home: const TimerPage(),
     );
   }
 }
 
 class TimerPage extends StatefulWidget {
+  const TimerPage({super.key});
+
   @override
   _TimerPageState createState() => _TimerPageState();
 }
@@ -36,7 +46,6 @@ class _TimerPageState extends State<TimerPage> {
   String logStatus = "Modo sin conexión Bluetooth";
   final TextEditingController _timeController = TextEditingController();
 
-  final Color azulUTMACH = const Color(0xFF4DA6FF);
   final Color naranjaUTMACH = const Color(0xFFFF8C29);
 
   @override
@@ -50,7 +59,6 @@ class _TimerPageState extends State<TimerPage> {
 
   // --- LÓGICA BLUETOOTH ULTRA-RÁPIDA ---
   void conectarBluetooth() async {
-    // 1. Pedir permisos runtime (Android 12+ / API 31+)
     Map<Permission, PermissionStatus> statuses = await [
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
@@ -63,7 +71,6 @@ class _TimerPageState extends State<TimerPage> {
     if (!mounted) return;
 
     if (!scanOk || !connectOk) {
-      // Si el usuario negó permanentemente, ofrecer ir a ajustes
       bool permanentlyDenied =
           (statuses[Permission.bluetoothScan]?.isPermanentlyDenied ?? false) ||
           (statuses[Permission.bluetoothConnect]?.isPermanentlyDenied ?? false);
@@ -75,13 +82,9 @@ class _TimerPageState extends State<TimerPage> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text("Permisos requeridos"),
-            content: const Text(
-                "Activa los permisos de Bluetooth y Ubicación en Ajustes para conectar el marcador."),
+            content: const Text("Activa los permisos de Bluetooth y Ubicación en Ajustes para conectar el marcador."),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancelar"),
-              ),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
@@ -131,7 +134,7 @@ class _TimerPageState extends State<TimerPage> {
     }
   }
 
-  // LA MAGIA ESTÁ AQUÍ: Enviamos un Byte puro en lugar de texto
+  // LA MAGIA DE ARTEMISA ESTÁ AQUÍ: Enviamos un Byte puro
   void enviarComandoByte(int byteCmd, int seg) async {
     if (connection != null && connection!.isConnected) {
       try {
@@ -211,115 +214,149 @@ class _TimerPageState extends State<TimerPage> {
     bool isRunning = _timer != null && _timer!.isActive;
 
     return Scaffold(
-      backgroundColor: azulUTMACH,
+      backgroundColor: Colors.black, // Color base de seguridad
+      
+      // La AppBar se vuelve transparente para que el fondo suba hasta arriba
       appBar: AppBar(
-        title: const Text("Contador 24 y 14 segundos", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text("CONTADOR 24 14 SEGUNDOS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white, letterSpacing: 1.2)),
         centerTitle: true,
+        backgroundColor: Colors.transparent, // Barra transparente
+        elevation: 0, // Sin sombra
         actions: [
-          IconButton(icon: const Icon(Icons.bluetooth, size: 30), onPressed: conectarBluetooth)
+          IconButton(
+            icon: const Icon(Icons.bluetooth_connected, size: 30, color: Colors.white), 
+            onPressed: conectarBluetooth
+          )
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              // Marcador Visual
-              Container(
-                width: 220, height: 220,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 15)],
-                  border: Border.all(color: Colors.white, width: 5),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  tiempoRestante.toString().padLeft(2, '0'),
-                  style: const TextStyle(color: Colors.red, fontSize: 140, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                ),
-              ),
-              const SizedBox(height: 15),
-              Text(logStatus, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1A237E))),
-              const SizedBox(height: 25),
+      extendBodyBehindAppBar: true, // Esto hace que el fondo ocupe TODA la pantalla
 
-              // Botones Rápidos 14/24
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      // EL CONTENEDOR INTELIGENTE PARA EL FONDO
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/fondo.png'), // Tu imagen vertical
+            fit: BoxFit.cover, // El recorte inteligente que evita que se achate
+          ),
+        ),
+        
+        // SafeArea protege que el contenido no quede debajo de la muesca de la cámara
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+              child: Column(
                 children: [
-                  _buildBotonTexturizado("14", () {
-                    _timer?.cancel();
-                    ultimoTiempoSeteado = 14;
-                    enviarComandoByte(253, 14); // Enviamos código 253
-                  }),
-                  _buildBotonTexturizado("24", () {
-                    _timer?.cancel();
-                    ultimoTiempoSeteado = 24;
-                    enviarComandoByte(254, 24); // Enviamos código 254
-                  }),
-                ],
-              ),
-              const SizedBox(height: 30),
+                  const SizedBox(height: 10),
+                  
+                  // Marcador Visual con cristal oscuro
+                  Container(
+                    width: 220, height: 220,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.85), // Translúcido
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 15)],
+                      border: Border.all(color: Colors.white, width: 4),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      tiempoRestante.toString().padLeft(2, '0'),
+                      style: const TextStyle(color: Colors.red, fontSize: 140, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  
+                  // Fondo semi-transparente para el texto de log (legibilidad total)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(logStatus, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo)),
+                  ),
+                  const SizedBox(height: 25),
 
-              // Input Manual Blindado
-              TextField(
-                controller: _timeController,
-                keyboardType: TextInputType.number,
-                enableInteractiveSelection: false,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(2),
-                ],
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  hintText: "00-99 seg",
-                  filled: true, fillColor: Colors.white,
-                  prefixIcon: const Icon(Icons.timer, color: Colors.indigo),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.check_circle, color: Colors.green, size: 45),
-                    onPressed: () {
-                      int? val = int.tryParse(_timeController.text);
-                      if (val != null && val >= 0 && val <= 99) {
+                  // Botones Rápidos 14/24
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildBotonTexturizado("14", () {
                         _timer?.cancel();
-                        ultimoTiempoSeteado = val;
-                        enviarComandoByte(val, val); // Enviamos el número crudo
-                      }
-                      _timeController.clear();
-                      FocusScope.of(context).unfocus();
-                    },
+                        ultimoTiempoSeteado = 14;
+                        enviarComandoByte(253, 14); 
+                      }),
+                      _buildBotonTexturizado("24", () {
+                        _timer?.cancel();
+                        ultimoTiempoSeteado = 24;
+                        enviarComandoByte(254, 24); 
+                      }),
+                    ],
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-              ),
+                  const SizedBox(height: 30),
 
-              const SizedBox(height: 40),
+                  // Input Manual Blindado (con fondo translúcido blanco)
+                  TextField(
+                    controller: _timeController,
+                    keyboardType: TextInputType.number,
+                    enableInteractiveSelection: false,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      hintText: "Manual: 00-99",
+                      filled: true, fillColor: Colors.white.withOpacity(0.95), 
+                      prefixIcon: const Icon(Icons.timer, color: Colors.indigo),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.check_circle, color: Colors.green, size: 45),
+                        onPressed: () {
+                          int? val = int.tryParse(_timeController.text);
+                          if (val != null && val >= 0 && val <= 99) {
+                            _timer?.cancel();
+                            ultimoTiempoSeteado = val;
+                            enviarComandoByte(val, val); 
+                          }
+                          _timeController.clear();
+                          FocusScope.of(context).unfocus();
+                        },
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                  ),
 
-              // Controles Inferiores
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildBotonControl(
-                    child: const Text("0", style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold, color: Colors.white)),
-                    color: Colors.grey[850]!,
-                    accion: setZero,
-                    size: 75,
-                  ),
-                  _buildBotonControl(
-                    child: Icon(isRunning ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 65),
-                    color: isRunning ? Colors.orange : Colors.green,
-                    accion: togglePlayPause,
-                    size: 110,
-                  ),
-                  _buildBotonControl(
-                    child: const Icon(Icons.refresh, color: Colors.white, size: 45),
-                    color: Colors.red,
-                    accion: resetToLast,
-                    size: 75,
+                  const SizedBox(height: 40),
+
+                  // Controles Inferiores Play/Pause/Reset
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildBotonControl(
+                        child: const Text("0", style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold, color: Colors.white)),
+                        color: Colors.grey[850]!.withOpacity(0.95),
+                        accion: setZero,
+                        size: 75,
+                      ),
+                      _buildBotonControl(
+                        child: Icon(isRunning ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 65),
+                        color: isRunning ? Colors.orange.withOpacity(0.95) : Colors.green.withOpacity(0.95),
+                        accion: togglePlayPause,
+                        size: 110,
+                      ),
+                      _buildBotonControl(
+                        child: const Icon(Icons.refresh, color: Colors.white, size: 45),
+                        color: Colors.red.withOpacity(0.95),
+                        accion: resetToLast,
+                        size: 75,
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -329,10 +366,13 @@ class _TimerPageState extends State<TimerPage> {
   Widget _buildBotonTexturizado(String t, VoidCallback onPress) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: naranjaUTMACH,
+        backgroundColor: naranjaUTMACH.withOpacity(0.95),
         foregroundColor: Colors.black,
         minimumSize: const Size(120, 120),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.white, width: 2),
+        ),
         elevation: 8,
       ),
       onPressed: onPress,
@@ -345,7 +385,10 @@ class _TimerPageState extends State<TimerPage> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         minimumSize: Size(size, size),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(25),
+          side: const BorderSide(color: Colors.white24, width: 1)
+        ),
         elevation: 10,
       ),
       onPressed: accion,
