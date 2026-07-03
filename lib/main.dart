@@ -212,6 +212,11 @@ class _TimerPageState extends State<TimerPage> {
   @override
   Widget build(BuildContext context) {
     bool isRunning = _timer != null && _timer!.isActive;
+    bool isConnected = connection != null && connection!.isConnected;
+    
+    // Heurística: Visibilidad del estado del sistema (Colores para conexión)
+    Color btColor = isConnected ? Colors.greenAccent : Colors.redAccent;
+    IconData btIcon = isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled;
 
     return Scaffold(
       backgroundColor: Colors.black, // Color base de seguridad
@@ -224,7 +229,8 @@ class _TimerPageState extends State<TimerPage> {
         elevation: 0, // Sin sombra
         actions: [
           IconButton(
-            icon: const Icon(Icons.bluetooth_connected, size: 30, color: Colors.white), 
+            icon: Icon(btIcon, size: 30, color: btColor),
+            tooltip: isConnected ? "Bluetooth Conectado" : "Conectar Bluetooth", 
             onPressed: conectarBluetooth
           )
         ],
@@ -251,9 +257,9 @@ class _TimerPageState extends State<TimerPage> {
                 children: [
                   const SizedBox(height: 10),
                   
-                  // Marcador Visual con cristal oscuro
+                  // Marcador Visual (Responsive seguro y con márgenes para que no se vea asfixiado)
                   Container(
-                    width: 220, height: 220,
+                    width: 260, height: 260,
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.85), // Translúcido
                       borderRadius: BorderRadius.circular(25),
@@ -261,21 +267,27 @@ class _TimerPageState extends State<TimerPage> {
                       border: Border.all(color: Colors.white, width: 4),
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      tiempoRestante.toString().padLeft(2, '0'),
-                      style: const TextStyle(color: Colors.red, fontSize: 140, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(35.0), // Margen exterior real
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: Text(
+                          tiempoRestante.toString().padLeft(2, '0'),
+                          style: const TextStyle(color: Colors.red, fontSize: 160, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 15),
                   
-                  // Fondo semi-transparente para el texto de log (legibilidad total)
+                  // Fondo semi-transparente para el texto de log dinámico (Feedback de status)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(12),
+                      color: isConnected ? Colors.green.withOpacity(0.85) : Colors.redAccent.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(logStatus, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo)),
+                    child: Text(logStatus, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
                   ),
                   const SizedBox(height: 25),
 
@@ -317,8 +329,12 @@ class _TimerPageState extends State<TimerPage> {
                           int? val = int.tryParse(_timeController.text);
                           if (val != null && val >= 0 && val <= 99) {
                             _timer?.cancel();
-                            ultimoTiempoSeteado = val;
-                            enviarComandoByte(val, val); 
+                            if (val == 0) {
+                              setZero();
+                            } else {
+                              ultimoTiempoSeteado = val;
+                              enviarComandoByte(val, val); 
+                            }
                           }
                           _timeController.clear();
                           FocusScope.of(context).unfocus();
