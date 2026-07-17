@@ -37,11 +37,12 @@ class TimerPage extends StatefulWidget {
   _TimerPageState createState() => _TimerPageState();
 }
 
-class _TimerPageState extends State<TimerPage> {
+class _TimerPageState extends State<TimerPage> with WidgetsBindingObserver {
   BluetoothConnection? connection;
   int tiempoRestante = 0;
   int ultimoTiempoSeteado = 0;
   Timer? _timer;
+  DateTime? _pausedTime;
 
   String logStatus = "Modo sin conexión Bluetooth";
   final TextEditingController _timeController = TextEditingController();
@@ -49,12 +50,37 @@ class _TimerPageState extends State<TimerPage> {
   final Color naranjaUTMACH = const Color(0xFFFF8C29);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     connection?.dispose();
     connection = null;
     _timeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      if (_timer != null && _timer!.isActive) {
+        _pausedTime = DateTime.now();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_pausedTime != null && _timer != null && _timer!.isActive) {
+        final elapsed = DateTime.now().difference(_pausedTime!).inSeconds;
+        setState(() {
+          tiempoRestante -= elapsed;
+          if (tiempoRestante < 0) tiempoRestante = 0;
+        });
+        _pausedTime = null;
+      }
+    }
   }
 
   // --- LÓGICA BLUETOOTH ULTRA-RÁPIDA ---
